@@ -4,6 +4,7 @@
 #include "cpu.h"
 
 #define DATA_LEN 6
+#define SP 7
 
  // Load the binary bytes from a .ls8 source file into a RAM array
 void cpu_load(struct cpu *cpu, char *filename) {
@@ -37,8 +38,7 @@ void cpu_load(struct cpu *cpu, char *filename) {
 // ## Step 2: Add RAM functions
 // mar = Memory Address Register. It holds a memory address
 // Goes to the CPU's RAM, at the index specified by mar
-unsigned char cpu_ram_read(struct cpu *cpu, unsigned char mar)
-{
+unsigned char cpu_ram_read(struct cpu *cpu, unsigned char mar) {
   return cpu->ram[mar];
 }
 
@@ -46,9 +46,19 @@ unsigned char cpu_ram_read(struct cpu *cpu, unsigned char mar)
 // mdr = Memory Data Register. It holds a value?
 // nothing needs to be returned bc we are just writing to memory
 // writing the mdr to RAM
-void cpu_ram_write(struct cpu *cpu, unsigned char index, unsigned char mdr)
-{
+void cpu_ram_write(struct cpu *cpu, unsigned char index, unsigned char mdr) {
   cpu->ram[index] = mdr;
+}
+
+void push(struct cpu *cpu, unsigned char value) {
+  cpu->reg[SP]--; // decrement the stack pointer
+  cpu_ram_write(cpu, cpu->reg[SP], value);
+}
+
+unsigned char pop(struct cpu *cpu) {
+  unsigned char value = cpu->ram[cpu->reg[SP]]; // grab value from ram that stack pointer is pointing to
+  cpu->reg[SP]++; // increment stack pointer so it moves "back" 1 spot in memory
+  return value;
 }
 
 
@@ -76,16 +86,16 @@ void cpu_run(struct cpu *cpu)
   unsigned char operandA, operandB; // initialize operand variables
 
   while (running) {
-    unsigned char IR = cpu->ram[cpu->pc]; // 1. Get the value of the current instruction (in address pc).
+    unsigned char IR = cpu->ram[cpu->PC]; // 1. Get the value of the current instruction (in address PC).
 
     unsigned int num_operands = IR >> 6; // 2. Figure out how many operands this next instruction requires. Shifting over 6 bits bc this info is stored in the IR at the far left 2 bits.
 
     if (num_operands == 2) { // 3. Get the appropriate value(s) of the operands following this instruction
-      operandA = cpu_ram_read(cpu, cpu->pc + 1);
-      operandB = cpu_ram_read(cpu, cpu->pc + 2);
+      operandA = cpu_ram_read(cpu, cpu->PC + 1);
+      operandB = cpu_ram_read(cpu, cpu->PC + 2);
 
     } else if (num_operands == 1) {
-      operandA = cpu_ram_read(cpu, cpu->pc + 1);
+      operandA = cpu_ram_read(cpu, cpu->PC + 1);
     }
 
     switch (IR) // 4. switch() over it to decide on a course of action.
@@ -106,6 +116,14 @@ void cpu_run(struct cpu *cpu)
         alu(cpu, ALU_MUL, operandA, operandB);
         break;
 
+      case PUSH:
+        push(cpu, cpu->reg[operandA]);
+        break;
+
+      case POP:
+        cpu->reg[operandA] = pop(cpu);
+        break;
+
       default:
         printf("Just Send It!!!");
         exit(1);
@@ -115,7 +133,7 @@ void cpu_run(struct cpu *cpu)
 
 
 
-    cpu->pc += num_operands + 1; // 6. Move the PC to the next instruction.
+    cpu->PC += num_operands + 1; // 6. Move the PC to the next instruction.
   }
 }
 
@@ -128,7 +146,8 @@ void cpu_run(struct cpu *cpu)
 void cpu_init(struct cpu *cpu)
 {
   cpu = malloc(sizeof(struct cpu));
-  cpu->pc = 0;
+  cpu->PC = 0;
   memset(cpu->ram, 0, sizeof(cpu->ram));
   memset(cpu->reg, 0, sizeof(cpu->reg));
+  cpu->reg[SP] = 0xF4; // stack pointer initialized to (RAM) address F4
 }
