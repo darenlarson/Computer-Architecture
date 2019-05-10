@@ -73,6 +73,24 @@ void alu(struct cpu *cpu, enum alu_op op, unsigned char regA, unsigned char regB
     case ALU_ADD:
       cpu->reg[regA] += cpu->reg[regB];
       break;
+
+    case ALU_CMP:
+      // printf("ALU_CMP\n");
+      // printf("cpu->reg[regA]: %d\n", cpu->reg[regA]);
+      // printf("cpu->reg[regB]: %d\n", cpu->reg[regB]);
+      if (cpu->reg[regA] == cpu->reg[regB]) {
+        // printf("A EQUALs B\n");
+        cpu->FL = 0b00000001;
+
+      } else if (cpu->reg[regA] < cpu->reg[regB]) {
+        // printf("A < B\n");
+        cpu->FL = 0b00000100;
+
+      } else if (cpu->reg[regA] > cpu->reg[regB]) {
+        // printf("A > B\n");
+        cpu->FL = 0b00000010;
+      }
+      break;
   }
 }
 
@@ -100,7 +118,7 @@ void cpu_run(struct cpu *cpu) {
     switch (IR) // 4. switch() over it to decide on a course of action.
     {
       case LDI: // ## Step 6: Add the `LDI` instruction. Set the value of a register to an integer.
-        // printf("LDI hit\n");
+        // printf("LDI\n");
         cpu->reg[operandA] = operandB;
         break;
 
@@ -110,39 +128,73 @@ void cpu_run(struct cpu *cpu) {
         break;
 
       case HLT: // ## Step 5: Implement the `HLT` instruction handler. Stops the while loop.
-        // printf("HLT hit\n");
+        // printf("HLT\n");
         running = 0;
         break;
 
       case MUL: // ## Step 9: Implement Multiply.
-        // printf("MUL hit\n");
+        printf("MUL\n");
         alu(cpu, ALU_MUL, operandA, operandB);
         break;
 
       case PUSH:
-        // printf("PUSH hit\n");
+        printf("PUSH\n");
         cpu_push(cpu, cpu->reg[operandA]);
         break;
 
       case POP:
-        // printf("POP hit\n");
+        printf("POP\n");
         cpu->reg[operandA] = cpu_pop(cpu);
         break;
       
       case ADD:
-        // printf("ADD hit\n");
+        printf("ADD\n");
         alu(cpu, ALU_ADD, operandA, operandB);
         break;
 
       case CALL:
-        // printf("CALL hit\n");
+        printf("CALL\n");
         cpu_push(cpu, cpu->PC + 1);
         cpu->PC = cpu->reg[operandA] - 2;
         break;
 
       case RET:
-        // printf("RET hit\n");
+        printf("RET\n");
         cpu->PC = cpu_pop(cpu);
+        break;
+
+      case CMP:
+        // printf("CMP\n");
+        // printf("operandA: %d\n", operandA);
+        // printf("operandB: %d\n", operandB);
+        // printf("cpu->reg[operandA]: %d\n", cpu->reg[operandA]);
+        // printf("cpu->reg[operandB]: %d\n", cpu->reg[operandB]);
+        alu(cpu, ALU_CMP, operandA, operandB);
+        break;
+
+      case JMP:
+        // printf("JMP\n");
+        // printf("num_operands: %d\n", num_operands);
+        // printf("operandA: %d\n", operandA);
+        // printf("cpu->reg[operandA]: %d\n", cpu->reg[operandA]);
+        cpu->PC = cpu->reg[operandA];
+        cpu->PC -= 2;
+        break;
+
+      case JEQ:
+        // printf("JEQ\n");
+        if (cpu->FL == 00000001) {
+          // printf("EQUAL\n");
+          cpu->PC = cpu->reg[operandA] - num_operands - 1;
+        }
+        break;
+
+      case JNE:
+        // printf("JNE\n");
+        if ((cpu->FL & 0b00000001) == 0) {
+          // printf("NOT EQUAL\n");
+          cpu->PC = cpu->reg[operandA] - num_operands - 1;
+        }
         break;
 
       default:
@@ -164,6 +216,7 @@ void cpu_run(struct cpu *cpu) {
 void cpu_init(struct cpu *cpu) {
   cpu = malloc(sizeof(struct cpu));
   cpu->PC = 0;
+  cpu->FL = 0;
   memset(cpu->ram, 0, sizeof(cpu->ram));
   memset(cpu->reg, 0, sizeof(cpu->reg));
   cpu->reg[SP] = 0xF4; // stack pointer initialized to (RAM) address F4
